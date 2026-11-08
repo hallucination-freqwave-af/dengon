@@ -178,6 +178,7 @@
         <button class="main" id="go">▶ 回す</button>
         <button id="stop" disabled>止める</button>
         <button id="save" disabled>記録を保存（JSON）</button>
+        <button id="savePng" disabled>絵をまとめて保存（ZIP）</button>
         <button id="read" hidden>めくって読む</button>
         <button id="endSoon" hidden>次のページで終わらせる</button>
         <button id="resume" hidden>続きを回す</button>
@@ -501,7 +502,7 @@ $('go').onclick=async()=>{
   else { const t=$('startText').value.trim(); if(!t){ setStatus('はじまりの言葉を書いてな。',true); return; } first={kind:'words',text:t}; }
   chain= first? [first] : []; total=0; addCost(0); $('chain').innerHTML=''; $('compare').classList.remove('on'); $('read').hidden=true; $('resume').hidden=true;
   const ctrl=new AbortController(); run={ctrl,stopped:false};
-  $('go').disabled=true; $('stop').disabled=false; $('save').disabled=true;
+  $('go').disabled=true; $('stop').disabled=false; $('save').disabled=$('savePng').disabled=true;
   if(mode==='ehon'){
     await ehonGo(ctrl); return; }
   const c0=el('div'); $('chain').appendChild(c0); renderCard(c0,first,0);
@@ -526,7 +527,7 @@ $('go').onclick=async()=>{
     if(!run.stopped) setStatus(mode==='loop'?'一周した。':'40手で止めた。'); else setStatus('止めた。');
     showCompare();
   }catch(e){ setStatus('止まった：'+e.message,true); showCompare(); }
-  finally{ $('go').disabled=false; $('stop').disabled=true; $('save').disabled=chain.length<2; const last=$('chain').lastElementChild; if(last&&chain.length>1) last.classList.add('last'); run=null; }
+  finally{ $('go').disabled=false; $('stop').disabled=true; $('save').disabled=$('savePng').disabled=chain.length<2; const last=$('chain').lastElementChild; if(last&&chain.length>1) last.classList.add('last'); run=null; }
 };
 $('stop').onclick=()=>{ if(run){ run.stopped=true; run.ctrl.abort(); } };
 let lastStop='';
@@ -540,10 +541,10 @@ async function ehonGo(ctrl,resume){
   try{ await runEhon(run.data? run.data.chapters.length : $('endless').checked ? 40 : Math.max(3,Math.min(16,+$('hops').value||8)), ctrl);
     lastStop= run.stopped?'止めた':'できた'; setStatus(run.stopped?'止めた。「続きを回す」で続けられる。':'絵本ができた。「めくって読む」で一ページずつ読める。'); }
   catch(e){ lastStop= run.stopped?'止めた':'止まった：'+e.message; setStatus(run.stopped?'止めた。「続きを回す」で続けられる。':'止まった：'+e.message+'（「続きを回す」でここから続けられる）',!run.stopped); }
-  finally{ const done=!!run.ended; $('go').disabled=false; $('stop').disabled=true; $('save').disabled=chain.length<2; $('read').hidden=chain.length<2; $('endSoon').hidden=true; $('resume').hidden=done||chain.length<1; run=null; }
+  finally{ const done=!!run.ended; $('go').disabled=false; $('stop').disabled=true; $('save').disabled=$('savePng').disabled=chain.length<2; $('read').hidden=chain.length<2; $('endSoon').hidden=true; $('resume').hidden=done||chain.length<1; run=null; }
 }
 $('resume').onclick=async()=>{ if(run||!chain.length||mode!=='ehon') return; rememberKey();
-  const ctrl=new AbortController(); run={ctrl,stopped:false}; $('go').disabled=true; $('stop').disabled=false; $('save').disabled=true; await ehonGo(ctrl,true); };
+  const ctrl=new AbortController(); run={ctrl,stopped:false}; $('go').disabled=true; $('stop').disabled=false; $('save').disabled=$('savePng').disabled=true; await ehonGo(ctrl,true); };
 $('endSoon').onclick=()=>{ if(run){ run.endSoon=true; $('endSoon').textContent='次で終わる'; $('endSoon').disabled=true; } };
 
 // 文の返事が空なら、同じ訳し手にもう一回、それでも空なら別の訳し手（Sonnet、Sonnetなら Opus）に頼む
@@ -738,6 +739,27 @@ $('save').onclick=()=>{ const data={app:'dengon',date:new Date().toISOString(),m
     chain:chain.map(s=>{ const o={...s}; delete o.data; return o; })};
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
   a.download='dengon_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
+
+/* 絵をまとめて保存：無圧縮ZIPを自前で組む（ライブラリなし） */
+const CRC=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function makeZip(files){ const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
+  for(const f of files){ const nm=enc.encode(f.name), d=f.data, crc=crc32(d);
+    const h=new DataView(new ArrayBuffer(30)); h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint32(14,crc,true); h.setUint32(18,d.length,true); h.setUint32(22,d.length,true); h.setUint16(12,0x21,true); h.setUint16(26,nm.length,true);
+    parts.push(h.buffer,nm,d);
+    const c=new DataView(new ArrayBuffer(46)); c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true); c.setUint32(16,crc,true); c.setUint32(20,d.length,true); c.setUint32(24,d.length,true); c.setUint16(14,0x21,true); c.setUint16(28,nm.length,true); c.setUint32(42,off,true);
+    cen.push(c.buffer,nm); off+=30+nm.length+d.length; }
+  const csize=cen.reduce((a,x)=>a+(x.byteLength??x.length),0);
+  const e=new DataView(new ArrayBuffer(22)); e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,csize,true); e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,e.buffer],{type:'application/zip'}); }
+function b64bytes(u){ const s=atob(u.split(',')[1]); const b=new Uint8Array(s.length); for(let i=0;i<s.length;i++) b[i]=s.charCodeAt(i); return b; }
+$('savePng').onclick=()=>{ const three=!!(ehonData&&ehonData.three); const cnt={}; const files=[];
+  for(const s of chain){ if(!s.png||!String(s.png).startsWith('data:image')) continue;
+    const sub=s.kind==='hdraw'?'人間ドラマ':(three?'数え方の話':'絵'); cnt[sub]=(cnt[sub]||0)+1;
+    files.push({name:sub+'/'+sub+'_'+String(cnt[sub]).padStart(2,'0')+'.png',data:b64bytes(s.png)}); }
+  if(!files.length){ alert('まだ絵がない'); return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(makeZip(files));
+  a.download='dengon_e_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.zip'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
 })();
 </script>
 </body>
