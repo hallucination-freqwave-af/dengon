@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>伝言ゲーム — 異文法の翻訳の輪</title>
+<style>
+  :root{--bg:#090c0e;--ink:#d8dfe2;--muted:#7d8a8f;--line:rgba(216,223,226,.14);--red:#c8352b;--card:rgba(255,255,255,.02)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.7 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{background:none;border:1px solid var(--line);border-radius:4px;padding:5px 12px;cursor:pointer}
+  button:hover:not(:disabled){border-color:var(--ink)}
+  button:disabled{opacity:.4;cursor:default}
+  button.main{border-color:rgba(216,223,226,.45);padding:7px 18px}
+  select,input[type=text],input[type=password],input[type=number],textarea{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 22px 80px}
+  h1{font:400 30px/1.2 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;margin:0 0 4px;letter-spacing:.04em}
+  h1 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);vertical-align:16px;margin-left:4px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .panel{border-top:1px solid var(--line);padding:16px 0;display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-start}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field>span{font-size:11px;letter-spacing:.14em;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .seg button.on{border-color:var(--ink);background:rgba(255,255,255,.06)}
+  #startPreview{width:120px;height:120px;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;overflow:hidden;cursor:pointer;text-align:center}
+  #startPreview img{width:100%;height:100%;object-fit:cover}
+  #startText{width:280px;height:120px;resize:vertical}
+  .note{color:var(--muted);font-size:12px}
+  .status{color:var(--muted);font-size:12.5px;min-height:1.7em}
+  .status.err{color:#e0806f}
+  #chain{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-top:10px}
+  .card{border:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;min-height:120px;position:relative}
+  .card.busy{border-style:dashed}
+  .card .head{display:flex;justify-content:space-between;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);gap:8px}
+  .card .head b{color:var(--ink);font-weight:500;letter-spacing:.06em;white-space:nowrap}
+  .card .head span{text-align:right}
+  .card .body{padding:12px;flex:1;display:flex;flex-direction:column;gap:8px}
+  .card img,.card canvas{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}
+  .card .words{white-space:pre-wrap;font:16px/1.9 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif}
+  .card details summary{cursor:pointer;color:var(--muted);font-size:12px}
+  .card pre{margin:6px 0 0;max-height:220px;overflow:auto;font:11px/1.5 ui-monospace,Menlo,monospace;color:#aab6ba;white-space:pre-wrap;word-break:break-all}
+  .card .err{color:#e0806f;font-size:12px}
+  .card .meta{font-size:11px;color:var(--muted);padding:0 12px 8px}
+  .roll{height:64px;background:#000;border:1px solid var(--line)}
+  .card.first{border-color:rgba(216,223,226,.35)}
+  .card.last{border-color:var(--red)}
+  .compare{display:none;border-top:1px solid var(--line);margin-top:26px;padding-top:16px}
+  .compare.on{display:block}
+  .compare .pair{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .compare .pair>div{width:240px}
+  .compare .pair .lbl{font-size:11px;letter-spacing:.14em;color:var(--muted);margin-bottom:6px}
+  .compare img,.compare canvas{width:100%;aspect-ratio:1;object-fit:cover;background:#000;display:block}
+  .compare .words{white-space:pre-wrap;font:15px/1.9 "Hiragino Mincho ProN","Yu Mincho",serif}
+  .spin{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);animation:p 1s infinite}
+  @keyframes p{50%{opacity:.2}}
+  #keyRow small{color:var(--muted)}
+  .page .pic{aspect-ratio:1;background:#000;display:flex;align-items:center;justify-content:center}
+  .page .pic img{width:100%;height:100%;object-fit:cover}
+  #chain.three{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+  .layer{border-top:1px solid var(--line)}
+  .layer .lbl{font-size:10.5px;letter-spacing:.16em;color:var(--muted);padding:8px 14px 0}
+  .layer.raw pre{margin:6px 14px 10px;max-height:150px;overflow:auto;font:10.5px/1.5 ui-monospace,Menlo,monospace;color:#8fa3a8;white-space:pre}
+  .layer.human .pic{aspect-ratio:1;background:#000;display:flex;align-items:center;justify-content:center}
+  .layer.human .pic img{width:100%;height:100%;object-fit:cover}
+  .layer.human .ptext{color:#f0e6d8}
+  #dropOv{position:fixed;inset:12px;border:2px dashed var(--red);border-radius:10px;background:rgba(9,12,14,.82);color:var(--ink);display:none;align-items:center;justify-content:center;font-size:16px;z-index:20;pointer-events:none}
+  #dropOv.on{display:flex}
+  #credits{position:fixed;inset:0;background:#000;z-index:11;display:none;overflow:hidden}
+  #credits.on{display:block}
+  #creditsRoll{position:absolute;left:0;right:0;top:100%;text-align:center;font:16px/2.2 "Hiragino Mincho ProN","Yu Mincho",serif;color:#e6e0d4}
+  #creditsRoll h3{font-weight:400;letter-spacing:.3em;margin:40px 0 16px;font-size:14px;color:#9aa}
+  #creditsRoll .row2{display:flex;justify-content:center;gap:18px}
+  #creditsRoll .row2 span:first-child{text-align:right;width:46%}
+  #creditsRoll .row2 span:last-child{text-align:left;width:46%;color:#aab4b6}
+  #credits .cbar{position:absolute;top:14px;right:16px;display:flex;gap:8px;z-index:2}
+  #credits .cbar a{color:inherit;text-decoration:none}
+  #credits .cbar button{color:#ccc;background:#000}
+  .page details.ev{padding:0 14px 6px;font-size:12px;color:var(--muted)}
+  .page details.ev pre{color:#9fb0b5}
+  .page .ptext{white-space:pre-wrap;font:16px/2 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;padding:14px 14px 4px}
+  #reader{position:fixed;inset:0;background:#06080a;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10;padding:20px}
+  #reader.on{display:flex}
+  #reader .rimg{width:min(78vh,92vw);aspect-ratio:1;background:#000;display:flex;align-items:center;justify-content:center}
+  #reader .rimg img{width:100%;height:100%;object-fit:contain}
+  #reader .rtext{max-width:min(78vh,92vw);margin-top:18px;white-space:pre-wrap;font:19px/2.1 "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;text-align:center;min-height:4em}
+  #reader .rbar{margin-top:14px;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12px}
+  #reader .rclose{position:fixed;top:14px;right:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>伝言ゲーム<span class="dot"></span></h1>
+  <p class="sub">一つの作品を、違う文法へ訳し継ぐ。写真 → 言葉 → 音 → 絵…。どこで何が落ちて、何が勝手に生まれるか。</p>
+
+  <div class="panel" id="keyRow">
+    <div class="field">
+      <span>APIキー</span>
+      <div class="row">
+        <input id="apiKey" type="password" placeholder="sk-ant-…" size="34" autocomplete="off">
+        <label class="row"><input type="checkbox" id="remember"> このブラウザに覚える</label>
+      </div>
+      <small>キーはこのブラウザから Anthropic に直接送るだけで、ほかのどこにも送らない。人に見られる画面では覚えさせんといて。</small>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <span>はじまり</span>
+      <div class="row seg" id="startKind">
+        <button data-k="photo" class="on">写真</button>
+        <button data-k="words">言葉</button>
+        <button data-k="data" hidden>データ（CSV）</button>
+      </div>
+      <div id="dataBox" hidden class="field">
+        <label class="row"><button type="button" id="csvPick">CSVを選ぶ</button><input type="file" id="csvFile" accept=".csv,text/csv" hidden></label>
+        <div class="note" id="csvInfo">異文法の銀河の「重なり」CSVか、関係を演奏する楽器の「観測」CSV</div>
+        <label class="row"><input type="checkbox" id="three" checked> 三層にする（CSV → 数え方の話 → 人間ドラマ、絵は二枚）</label>
+        <label class="row" id="stageRow">人間ドラマの舞台
+          <input id="stage" list="stageList" placeholder="おまかせ" size="18">
+          <datalist id="stageList">
+            <option value="江戸の長屋"><option value="遠い未来の宇宙船"><option value="昭和の団地"><option value="中世ヨーロッパの村">
+            <option value="海の上の漁船"><option value="雪に閉ざされた山の宿"><option value="現代の東京のオフィス"><option value="戦国時代の城下町">
+          </datalist></label>
+        <div class="row seg" id="followSeg">データに
+          <button data-f="strict" class="on">筋書きとして従う</button>
+          <button data-f="loose">気配として使う</button>
+        </div>
+      </div>
+      <div id="startPhotoBox" class="row">
+        <label id="startPreview" for="photoFile">ここを押して<br>写真を選ぶ</label>
+        <input type="file" id="photoFile" accept="image/*" hidden>
+      </div>
+      <textarea id="startText" hidden placeholder="ここに最初の言葉"></textarea>
+    </div>
+
+    <div class="field">
+      <span>輪のかたち</span>
+      <div class="row seg" id="modeSeg">
+        <button data-m="loop" class="on">一周して戻る</button>
+        <button data-m="flow">流れ続ける</button>
+        <button data-m="ehon">絵本</button>
+      </div>
+      <div class="row" id="loopOpts"><span id="hopsLbl">手数</span> <input type="number" id="hops" min="3" max="16" value="6" style="width:60px">
+        <label class="row" id="endlessWrap" hidden><input type="checkbox" id="endless"> 終わりを決めない</label></div>
+      <div class="row seg" id="readerSeg" hidden>読み手
+        <button data-r="adult" class="on">大人向け</button>
+        <button data-r="kids">子ども向け</button>
+      </div>
+      <div class="note" id="modeNote"></div>
+    </div>
+
+    <div class="field" id="setField">
+      <span>文法の並び</span>
+      <select id="set">
+        <option value="words,sound,draw">言葉 → 音 → 絵 を巡る</option>
+        <option value="draw,words">絵 と 言葉 を行き来</option>
+        <option value="sound,words">音 と 言葉 を行き来</option>
+        <option value="draw,sound">絵 と 音 を行き来</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <span>訳し手</span>
+      <select id="who">
+        <option value="haiku">Haiku だけ</option>
+        <option value="sonnet">Sonnet だけ</option>
+        <option value="opus">Opus だけ</option>
+        <option value="alt">Haiku と Sonnet を交互に</option>
+        <option value="rand">毎回くじ引き（Haiku・Sonnet・Opus）</option>
+      </select>
+      <div class="note">訛りが違う。Haiku は言い切って落とす、Sonnet は筋を通して足す…かもしれん。</div>
+    </div>
+
+    <div class="field">
+      <span>&nbsp;</span>
+      <div class="row">
+        <button class="main" id="go">▶ 回す</button>
+        <button id="stop" disabled>止める</button>
+        <button id="save" disabled>記録を保存（JSON）</button>
+        <button id="read" hidden>めくって読む</button>
+        <button id="endSoon" hidden>次のページで終わらせる</button>
+        <button id="resume" hidden>続きを回す</button>
+      </div>
+      <div class="note" id="cost">費用：0円</div>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div id="chain"></div>
+
+  <div id="credits"><div class="cbar"><a id="cGroove" href="https://hallucination-freqwave-af.github.io/igrammar-groove/" target="_blank" rel="noopener"><button>♪ 異文法グルーヴを鳴らす</button></a><button id="cClose">閉じる</button></div><div id="creditsRoll"></div></div>
+  <div id="reader"><button class="rclose" id="rClose">閉じる</button><div class="rimg" id="rImg"></div><div class="rtext" id="rText"></div>
+  <div class="rbar"><button id="rPrev">←</button><span id="rNum"></span><button id="rNext">→</button></div></div>
+
+  <div class="compare" id="compare">
+    <div class="note" style="margin-bottom:10px">最初と最後</div>
+    <div class="pair" id="comparePair"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+
+// ---------- 料金（100万トークンあたりのドル） ----------
+const MODELS={
+  haiku:{id:'claude-haiku-5-5',name:'Haiku 5.5',in:0.10,out:0.50},
+  sonnet:{id:'claude-sonnet-5-5',name:'Sonnet 5.5',in:2,out:10},
+  opus:{id:'claude-opus-5-5',name:'Opus 5.5',in:4,out:20}
+};
+const YEN=150;
+const G={photo:'写真',words:'言葉',sound:'音',draw:'絵'};
+
+// ---------- キー ----------
+try{ const k=localStorage.getItem('dengon-key'); if(k){ $('apiKey').value=k; $('remember').checked=true; } }catch(e){}
+function rememberKey(){ try{ if($('remember').checked) localStorage.setItem('dengon-key',$('apiKey').value.trim()); else localStorage.removeItem('dengon-key'); }catch(e){} }
+$('remember').onchange=rememberKey;
+
+// ---------- はじまり ----------
+let startKind='photo', startImage=null; // startImage: {data: base64, media: 'image/jpeg', url}
+$('startKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; startKind=b.dataset.k;
+  [...$('startKind').children].forEach(x=>x.classList.toggle('on',x===b));
+  $('startPhotoBox').hidden=startKind!=='photo'; $('startText').hidden=startKind!=='words'; $('dataBox').hidden=startKind!=='data';
+  $('endless').disabled= startKind==='data'; if(startKind==='data'){ $('endless').checked=false; $('hops').disabled=false; }
+  updateNote(); };
+$('photoFile').onchange=()=>{ const f=$('photoFile').files[0]; if(f) loadPhoto(f); };
+async function loadPhoto(f){
+  const img=await loadImg(URL.createObjectURL(f));
+  const c=document.createElement('canvas'), s=Math.min(1,768/Math.max(img.width,img.height));
+  c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  const url=c.toDataURL('image/jpeg',.85); startImage={url,data:url.split(',')[1],media:'image/jpeg'};
+  $('startPreview').innerHTML='<img alt="">'; $('startPreview').firstChild.src=url; }
+function loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; }); }
+
+// ---------- CSV（異文法の銀河／関係を演奏する楽器）を出来事に ----------
+const LANE={"yo":"ヨルバ","sx":"60進","sg":"算木","mx":"マヤ","ik":"インカ","gr":"ギリシャ","sb":"算盤","bi":"2進（易経）","tp":"トポロジー","ek":"易","pr":"素数","rd":"崩壊（三段目）","cl":"衝突","sr":"シューマン共振","hm":"地球のハム","su":"太陽の5分振動","td":"潮","hb":"呼吸と心拍","cs":"セシウム（1秒）","bd":"体（パプアニューギニア）","eg":"エジプト","hf":"ひふみ","fr":"フランス語","rm":"ローマ数字","bt":"蝙蝠","et":"干支","vn":"金星（マヤ）","tl":"ターラ（インド）","cv":"クラーヴェ（キューバ）","wk":"曜日","ci":"周期ゼミ","fb":"フィボナッチ","mn":"万進（漢字圏）","sk":"二十四節気","js":"助数詞（本）","im":"虚数"};
+const ln=k=>LANE[k]||k;
+function parseCSV(t){ t=t.replace(/^﻿/,''); const rows=[]; let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){ const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){ f+='"'; i++; } else q=false; } else f+=c; }
+    else if(c==='"') q=true; else if(c===','){ row.push(f); f=''; } else if(c==='\n'){ row.push(f.replace(/\r$/,'')); rows.push(row); row=[]; f=''; } else f+=c; }
+  if(f!==''||row.length){ row.push(f.replace(/\r$/,'')); rows.push(row); } return rows; }
+const top=(m,n)=>[...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,n);
+const inc=(m,k,v=1)=>m.set(k,(m.get(k)||0)+v);
+let dataSet=null; // {kind, label, chapters(n) -> [events text]}
+function loadData(text){ const R=parseCSV(text).filter(r=>r.length>1); if(R.length<3) throw new Error('行が少なすぎる');
+  const h=R[0];
+  if(h[0]==='回' && h[1]==='共通カウント') return {kind:'galaxy', head:h, rows:R.slice(1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]||'']))).filter(r=>+r['共通カウント']>0)};
+  if(h[0]==='世界' && h[1]==='カウント'){ let meta=null; const body=[]; R.slice(1).forEach(r=>{ if(r[0]==='条件'){ try{ meta=JSON.parse(r[1]); }catch(e){} } else body.push(Object.fromEntries(h.map((k,i)=>[k,r[i]||'']))); });
+    return {kind:'instrument', head:h, meta, rows:body.filter(r=>+r['カウント']>0)}; }
+  throw new Error('知らない形のCSV（異文法の銀河の重なりCSVか、楽器の観測CSVを選んでな）'); }
+function chaptersOf(d,n){ const key= d.kind==='galaxy'?'共通カウント':'カウント', nums=d.rows.map(r=>+r[key]), lo=Math.min(...nums), hi=Math.max(...nums), w=(hi-lo+1)/n, out=[];
+  for(let i=0;i<n;i++){ const a=Math.round(lo+i*w), b= i===n-1? hi : Math.round(lo+(i+1)*w)-1;
+    const rs=d.rows.filter(r=>+r[key]>=a && +r[key]<=b);
+    out.push({a,b,events: d.kind==='galaxy'? galaxyEvents(d,rs,i,n) : instrumentEvents(d,rs,a,b), raw: rawExcerpt(d,rs)}); }
+  return out; }
+// そのページの区間から、出来事のある行を中心に生のCSVを数行抜く
+function rawExcerpt(d,rs){ const cols= d.kind==='galaxy'? ['共通カウント','レーン','ずれ','理由','関係','すれ違った相手'] : ['カウント','強く鳴った','衝突でずれた','ずれ','拒否した','負担を受けた','凍結中','第3の拍 誕生'];
+  const hot= d.kind==='galaxy'? r=>r['関係']==='第3の拍'||r['関係']==='すれ違い'||+r['ずれ'] : r=>r['拒否した']||r['衝突でずれた']||r['第3の拍 誕生'];
+  const pick=[...rs.filter(hot).slice(0,6), ...rs.filter(r=>!hot(r)).slice(0,2)].sort((x,y)=>+x[cols[0]]-+y[cols[0]]);
+  const cut=v=>{ v=String(v||''); return v.length>22? v.slice(0,21)+'…' : v; };
+  return [cols.join(','), ...pick.map(r=>cols.map(c=>cut(r[c])).join(','))].join('\n'); }
+function galaxyEvents(d,rs,ci,n){ const E=[], loud=new Map(), shift=new Map(), alias=new Map(), firstSeen=new Map(), lastSeen=new Map();
+  d.rows.forEach(r=>{ const L=r['レーン'], c=+r['共通カウント']; if(!firstSeen.has(L)) firstSeen.set(L,c); lastSeen.set(L,c); });
+  const byCount=new Map(); rs.forEach(r=>{ inc(loud,r['レーン']); if(+r['ずれ']) inc(shift,r['レーン'],Math.abs(+r['ずれ'])); const c=r['共通カウント']; if(!byCount.has(c)) byCount.set(c,[]); byCount.get(c).push(r); });
+  if(!rs.length) return ['この区間は、誰も鳴らなかった。静かな時間。'];
+  E.push('よく鳴った：'+top(loud,3).map(([k,v])=>k+'（'+v+'回）').join('、'));
+  const a=+rs[0]['共通カウント'], b=+rs[rs.length-1]['共通カウント'];
+  const born=[...firstSeen].filter(([k,c])=>c>=a&&c<=b&&c>+d.rows[0]['共通カウント']).map(([k])=>k); if(born.length) E.push('初めて現れた：'+born.join('、'));
+  const gone=ci<n-1? [...lastSeen].filter(([k,c])=>c>=a&&c<=b).map(([k])=>k):[]; if(gone.length) E.push('ここで最後に姿を見せて、もう現れない：'+gone.join('、'));
+  byCount.forEach(g=>{ const byKey=new Map(); g.filter(r=>r['関係']==='別名').forEach(r=>{ if(!byKey.has(r['理由'])) byKey.set(r['理由'],[]); byKey.get(r['理由']).push(r['レーン']); });
+    byKey.forEach((names,why)=>{ if(names.length>1) inc(alias,names.sort().join('と')+'（'+why+'）'); }); });
+  if(alias.size) E.push('同じ理由で重なった（同じ種類の仲間だと分かる）：'+top(alias,2).map(([k,v])=>k+' ×'+v).join('、'));
+  let big=null; byCount.forEach((g,c)=>{ const u=[...new Set(g.map(r=>r['レーン']))]; if(!big||u.length>big.u.length) big={c,u}; }); if(big&&big.u.length>=4) E.push('カウント'+big.c+'で、'+big.u.length+'人が一度に鳴った：'+big.u.join('、'));
+  const miss=new Map(); rs.filter(r=>r['関係']==='すれ違い').forEach(r=>inc(miss,r['レーン']+'が'+r['すれ違った相手']+'とすれ違った（相手は'+r['相手が遅れて来るカウント数']+'カウント遅れて来た）'));
+  if(miss.size) E.push(...top(miss,2).map(([k,v])=>k+(v>1?' ×'+v:'')));
+  const third=new Map(); rs.filter(r=>r['関係']==='第3の拍').forEach(r=>{ const m=r['理由'].match(/(\d+)ごと（(.+?)）/); if(!m) return; const k=r['レーン']+'と'+r['すれ違った相手']+'|'+m[1]; if(!third.has(k)) third.set(k,{b:0,d:0,first:m[2]}); const o=third.get(k); if(m[2]==='生まれた') o.b++; else o.d++; });
+  third.forEach((o,k)=>{ const [who,g]=k.split('|'); E.push(who+'のあいだに、二人にしかない'+g+'ごとの拍が'+(o.b&&o.d? (o.first==='生まれた'?'生まれては消えた':'消えては、また生まれた')+'（生まれた'+o.b+'回・消えた'+o.d+'回）' : o.b? '生まれた' : '消えた')); });
+  if(shift.size) E.push('衝突で拍をずらされた：'+top(shift,2).map(([k,v])=>k+'（合わせて'+v+'）').join('、'));
+  const lone=rs.filter(r=>r['関係']==='理由なし').length; if(lone) E.push('理由なく、偶然に鳴った：'+lone+'回');
+  return E; }
+function instrumentEvents(d,rs,a,b){ const E=[], loud=new Map(), solo=new Map(), shift=new Map(), refuse=new Map(), burden=new Map(), born=new Map();
+  if(!rs.length) return ['この区間は記録がない。'];
+  let frozen=0, freezeStarts=0, wasF=false, fill=0, unres=0, tmax=0, tsum=0;
+  rs.forEach(r=>{ (r['強く鳴った']||'').split('／').filter(Boolean).forEach(k=>inc(loud,k)); if(r['ひとりで鳴った']) inc(solo,r['ひとりで鳴った']);
+    if(r['衝突でずれた']) inc(shift,r['衝突でずれた'],Math.abs(+r['ずれ']||1)); if(r['拒否した']) inc(refuse,r['拒否した']+'が拒んで、'+(r['負担を受けた']? r['負担を受けた']+'が代わりに負担を受けた' : '誰も引き受けなかった'));
+    const f=r['凍結中']==='1'; if(f){ frozen++; if(!wasF) freezeStarts++; } wasF=f; if(r['フィル中']==='1') fill++; if(r['未解決']==='1') unres++;
+    const t=+r['緊張']||0; tmax=Math.max(tmax,t); tsum+=t;
+    if(r['第3の拍 誕生']) r['第3の拍 誕生'].split(' ').filter(Boolean).forEach(x=>{ const m=x.match(/^(\w+)\|(\w+):(\d+)$/); if(m) inc(born,ln(m[1])+'と'+ln(m[2])+'のあいだに'+m[3]+'ごとの拍'); }); });
+  E.push('カウント'+a+'〜'+b+'。緊張は平均'+(tsum/rs.length).toFixed(1)+'、いちばん高いとき'+tmax.toFixed(1));
+  E.push('よく鳴った：'+top(loud,3).map(([k])=>k).join('、'));
+  if(solo.size) E.push('ひとりきりで鳴った：'+top(solo,2).map(([k,v])=>k+'（'+v+'回）').join('、'));
+  if(shift.size) E.push('衝突で拍をずらされた：'+top(shift,2).map(([k,v])=>k+'（合わせて'+v+'）').join('、'));
+  if(refuse.size) E.push('ずらされるのを拒んだ：'+top(refuse,2).map(([k,v])=>k+' ×'+v).join('、'));
+  if(freezeStarts) E.push('世界が凍りついた：'+freezeStarts+'回、合わせて'+frozen+'カウントのあいだ動けなかった'+(unres?'（解けないまま残った時間も'+unres+'カウント）':''));
+  if(born.size) E.push('二人にしかない第3の拍が生まれた：'+top(born,3).map(([k,v])=>k+(v>1?'（'+v+'回）':'')).join('、'));
+  if(fill/rs.length>.3) E.push('音が薄くなって、ほとんど聞こえない時間が長かった（'+Math.round(fill/rs.length*100)+'%）');
+  const abs=r=>new Set((r['居ない']||'').split('／').filter(Boolean)), A0=abs(rs[0]), A1=abs(rs[rs.length-1]);
+  const left=[...A1].filter(x=>!A0.has(x)), back=[...A0].filter(x=>!A1.has(x));
+  if(left.length) E.push('いなくなった：'+left.slice(0,3).join('、')); if(back.length) E.push('戻ってきた：'+back.slice(0,3).join('、'));
+  ((d.meta&&d.meta.commands)||[]).filter(c=>c['カウント']>=a&&c['カウント']<=b).forEach(c=>E.push('外から命令が来た：「'+c['命令']+'」（'+(c['誰']||'')+'）'));
+  return E; }
+function castCount(d){ const m=new Map();
+  if(d.kind==='galaxy') d.rows.forEach(r=>inc(m,r['レーン']));
+  else d.rows.forEach(r=>(r['強く鳴った']||'').split('／').filter(Boolean).forEach(k=>inc(m,k)));
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]); }
+$('three').onchange=()=>{ $('stageRow').hidden=!$('three').checked; };
+$('csvPick').onclick=()=>$('csvFile').click();
+$('csvFile').onchange=()=>{ const f=$('csvFile').files[0]; if(f) loadCsv(f); };
+async function loadCsv(f){
+  try{ const d=loadData(await f.text()); d.name=f.name; dataSet=d;
+    const key=d.kind==='galaxy'?'共通カウント':'カウント', nums=d.rows.map(r=>+r[key]);
+    $('csvInfo').textContent=(d.kind==='galaxy'?'異文法の銀河（重なり）':'関係を演奏する楽器（観測）')+'：'+d.rows.length+'行、カウント'+Math.min(...nums)+'〜'+Math.max(...nums);
+    $('csvInfo').classList.remove('err'); }
+  catch(e){ dataSet=null; $('csvInfo').textContent='読めなかった：'+e.message; } }
+let follow='strict';
+$('followSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; follow=b.dataset.f; [...$('followSeg').querySelectorAll('button')].forEach(x=>x.classList.toggle('on',x===b)); };
+
+let mode='loop';
+$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const was=mode; mode=b.dataset.m;
+  [...$('modeSeg').children].forEach(x=>x.classList.toggle('on',x===b)); $('loopOpts').hidden=mode==='flow';
+  const eh=mode==='ehon'; $('setField').hidden=eh; $('startKind').querySelector('[data-k=photo]').disabled=eh;
+  $('startKind').querySelector('[data-k=data]').hidden=!eh;
+  if(eh && startKind==='photo') $('startKind').querySelector('[data-k=words]').click();
+  if(!eh && startKind==='data') $('startKind').querySelector('[data-k=photo]').click();
+  $('hopsLbl').textContent= eh?'ページ':'手数'; $('endlessWrap').hidden=!eh; $('readerSeg').hidden=!eh; $('hops').disabled= eh && $('endless').checked;
+  if(eh!==(was==='ehon')) $('hops').value= eh?8:6;
+  updateNote(); };
+function updateNote(){ $('modeNote').textContent= mode==='loop'
+  ? '最後の一手は、はじまりに一番近い文法（写真なら絵、言葉なら言葉）に戻す。並びにその文法が無ければ、巡るだけ。'
+  : mode==='flow' ? '止めるまで、毎回ちがう文法へ流れていく（最大40手）。'
+  : startKind==='data' ? 'CSVを、ページ数ぶんの区間に切る。書き手は区間ごとに「本当に起きたこと」を受け取って、数え方たちを登場人物にしてページを書く。絵描きはそのページの文だけを見て描く。'
+  : '最初の言葉が1ページ目。絵描きはそのページの文だけを見て描く。書き手はそれまでの話を全部覚えたまま、新しい絵を見て次のページを書く。'
+    + ($('endless').checked ? '終わりは決めない。回しながら「次のページで終わらせる」を押すと、そこで閉じる（押さなければ最大40ページ）。' : '最後のページで終わらせる。'); }
+updateNote();
+let readerKind='adult';
+$('readerSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; readerKind=b.dataset.r; [...$('readerSeg').querySelectorAll('button')].forEach(x=>x.classList.toggle('on',x===b)); };
+$('endless').onchange=()=>{ $('hops').disabled=$('endless').checked; updateNote(); };
+
+// ---------- 訳し手の選び方 ----------
+function pickModel(i){ const w=$('who').value;
+  if(w==='alt') return i%2? 'sonnet':'haiku';
+  if(w==='rand') return ['haiku','sonnet','opus'][Math.floor(Math.random()*3)];
+  return w; }
+
+// ---------- 文法の順番 ----------
+function getSet(){ return $('set').value.split(','); }
+function planLoop(start,n,set){ // 最後は、はじまりに一番近い文法（写真なら絵、言葉なら言葉）に戻す。並びに無ければ戻さず巡るだけ
+  const L=set.length, homeWant= start==='photo'?'draw':'words', home= set.includes(homeWant)?homeWant:null, seq=new Array(n);
+  if(home){ seq[n-1]=home; for(let i=n-2;i>=0;i--) seq[i]=set[(set.indexOf(seq[i+1])-1+L)%L];
+    const bad=g=> g===start || (start==='photo'&&g==='draw');
+    if(bad(seq[0])){ const alt=set.find(g=>!bad(g)&&g!==seq[1]); if(alt) seq[0]=alt; }
+    if(seq[0]===start){ const pre=set.find(g=>g!==start); if(pre) seq.unshift(pre); } } // 言葉→言葉にならんよう、一手足す
+  else { let k=set.findIndex(g=>g!==start); for(let i=0;i<n;i++) seq[i]=set[(k+i)%L]; }
+  return seq; }
+function nextFlow(cur,set){ let opts=set.filter(g=>g!==cur); if(cur==='photo'&&opts.length>1) opts=opts.filter(g=>g!=='draw'); return opts[Math.floor(Math.random()*opts.length)]; }
+
+// ---------- 指示文 ----------
+const SYSTEM=`You are one link in a game of telephone between different grammars (media). You receive a work in one grammar and re-express it in another grammar.
+Translate what you perceive — mood, structure, rhythm, density, motifs — not a literal description. You will lose things and you may invent things; that drift is the point.
+Never explain, never mention translation or the source, never ask questions. Output only the requested format.`;
+const TARGET={
+  words:`Target grammar: WORDS. Write in Japanese, 2 to 6 short lines, no title, no quotation marks, no emoji. Output plain text only.`,
+  sound:`Target grammar: SOUND. Output one \`\`\`json block and nothing else. Format:
+{"bpm": number 40-180, "notes": [{"t": start in beats, "d": duration in beats, "f": frequency in Hz 40-2000, "w": "sine"|"triangle"|"square"|"sawtooth"|"noise", "g": gain 0-1}]}
+Use 8 to 64 notes. Total length at most 32 beats. Silence and overlap are allowed.`,
+  draw:`Target grammar: A PICTURE MADE BY CODE. Output one \`\`\`js block and nothing else.
+The code runs as a function body. In scope: ctx (CanvasRenderingContext2D), W and H (both 512), rand() (seeded random, returns 0..1).
+Draw one complete picture synchronously. No external resources, no async, no timers, no DOM access, no animation. Keep it short: under 80 lines.`
+};
+function sourceBlocks(src){
+  if(src.kind==='photo') return [{type:'text',text:'Source grammar: PHOTOGRAPH.'},{type:'image',source:{type:'base64',media_type:src.media,data:src.data}}];
+  if(src.kind==='draw' && src.png) return [{type:'text',text:'Source grammar: A PICTURE (it was drawn by code; you see only the picture).'},{type:'image',source:{type:'base64',media_type:'image/png',data:src.png.split(',')[1]}}];
+  if(src.kind==='draw') return [{type:'text',text:'Source grammar: CODE THAT TRIED TO DRAW A PICTURE (it failed to run). Read the code as the work.\n\n'+src.code}];
+  if(src.kind==='words') return [{type:'text',text:'Source grammar: WORDS.\n\n'+src.text}];
+  if(src.kind==='sound') return [{type:'text',text:'Source grammar: SOUND, given as a score. You cannot hear it — read it as music.\n\n'+JSON.stringify(src.score)}];
+}
+
+// ---------- API ----------
+async function translate(src,target,mkey,signal){
+  return callClaude(SYSTEM,[...sourceBlocks(src),{type:'text',text:TARGET[target]}],mkey,target==='draw'?8000:3000,signal); }
+const sleep=(ms,signal)=>new Promise((res,rej)=>{ const t=setTimeout(res,ms); if(signal) signal.addEventListener('abort',()=>{ clearTimeout(t); rej(new DOMException('aborted','AbortError')); },{once:true}); });
+async function callClaude(system,content,mkey,maxTokens,signal){
+  const m=MODELS[mkey];
+  const body={model:m.id,max_tokens:maxTokens,system,messages:[{role:'user',content}]};
+  let r,j;
+  for(let attempt=0;;attempt++){ // 混雑（429・5xx・529）や通信の失敗なら、少し待って2回までやり直す
+    try{ r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal,headers:{
+        'content-type':'application/json','x-api-key':$('apiKey').value.trim(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(body)});
+      j=await r.json().catch(()=>({})); }
+    catch(e){ if(e.name==='AbortError'||attempt>=2) throw e; setStatus('通信が切れた。少し待ってやり直す…'); await sleep(4000*(attempt+1),signal); continue; }
+    if(r.ok) break;
+    const retry= r.status===429 || r.status>=500;
+    if(!retry||attempt>=2) throw new Error((j.error&&j.error.message)||('HTTP '+r.status));
+    setStatus('APIが混んでる（'+r.status+'）。少し待ってやり直す…'); await sleep(5000*(attempt+1),signal); }
+  const text=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+  const u=j.usage||{}; const cost=((u.input_tokens||0)*m.in+(u.output_tokens||0)*m.out)/1e6;
+  return {text,cost,usage:u,cut:j.stop_reason==='max_tokens',stop:j.stop_reason};
+}
+function block(text){ // ```で囲まれた中身。閉じがなければ（途中で切れたとき）頭の```行だけ外す
+  const m=text.match(/```[a-zA-Z]*[ \t]*\n?([\s\S]*?)```/); if(m) return m[1].trim();
+  return text.replace(/^[\s\S]*?```[a-zA-Z]*[ \t]*\n?/,'').trim(); }
+
+// 途中で切れたコードを、描けるところまで救う（構文だけ確かめる。ここでは走らせない）
+function salvage(code){ const L=code.split('\n');
+  for(let n=L.length;n>0 && L.length-n<60;n--){ const body=L.slice(0,n).join('\n');
+    const open=Math.max(0,(body.match(/[{]/g)||[]).length-(body.match(/[}]/g)||[]).length), par=Math.max(0,(body.match(/[(]/g)||[]).length-(body.match(/[)]/g)||[]).length);
+    for(const tail of [ '', ')'.repeat(par)+';'+'}'.repeat(open), '}'.repeat(open) ]){ const c=body+'\n'+tail;
+      try{ new Function('ctx','W','H','rand',c); return c; }catch(e){} } }
+  return code; }
+
+// ---------- 絵のコードを箱の中で走らせる ----------
+let frameN=0;
+function runDraw(code){ return new Promise(res=>{
+  const id='f'+(++frameN), ifr=document.createElement('iframe');
+  ifr.setAttribute('sandbox','allow-scripts'); ifr.style.cssText='position:absolute;left:-9999px;width:10px;height:10px';
+  const done=v=>{ clearTimeout(to); window.removeEventListener('message',on); ifr.remove(); res(v); };
+  const on=e=>{ if(e.source===ifr.contentWindow && e.data && e.data.id===id) done(e.data); };
+  window.addEventListener('message',on);
+  const to=setTimeout(()=>done({err:'4秒たっても描き終わらなかった'}),4000);
+  const seed=Math.floor(Math.random()*1e9);
+  ifr.srcdoc=`<canvas id=c width=512 height=512></canvas><script>
+  (function(){var c=document.getElementById('c'),ctx=c.getContext('2d'),W=512,H=512,s=${seed};
+  function rand(){s|=0;s=s+0x6D2B79F5|0;var t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  try{ (new Function('ctx','W','H','rand',${JSON.stringify(code)}))(ctx,W,H,rand);
+    parent.postMessage({id:'${id}',png:c.toDataURL('image/png')},'*'); }
+  catch(e){ parent.postMessage({id:'${id}',err:String(e&&e.message||e)},'*'); } })();<\/script>`;
+  document.body.appendChild(ifr);
+}); }
+
+// ---------- 音を鳴らす ----------
+let ac=null, playing=null;
+function parseScore(text){ const s=JSON.parse(block(text)); if(!s||!Array.isArray(s.notes)) throw new Error('譜面の形になっていない');
+  s.bpm=Math.max(40,Math.min(180,+s.bpm||90));
+  s.notes=s.notes.slice(0,64).map(n=>({t:Math.max(0,+n.t||0),d:Math.max(.05,Math.min(16,+n.d||.5)),f:Math.max(40,Math.min(2000,+n.f||220)),w:['sine','triangle','square','sawtooth','noise'].includes(n.w)?n.w:'sine',g:Math.max(0,Math.min(1,n.g==null?.5:+n.g))}));
+  return s; }
+function scoreLen(s){ return s.notes.reduce((a,n)=>Math.max(a,n.t+n.d),0)*60/s.bpm; }
+function play(s,btn){
+  if(playing){ playing.stop(); if(playing.btn===btn){ playing=null; return; } }
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)(); ac.resume();
+  const out=ac.createGain(); out.gain.value=.25; out.connect(ac.destination);
+  const t0=ac.currentTime+.05, b=60/s.bpm, nodes=[];
+  let nb=null;
+  s.notes.forEach(n=>{ const st=t0+n.t*b, en=st+n.d*b, g=ac.createGain();
+    g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(Math.max(.001,n.g),st+.01); g.gain.exponentialRampToValueAtTime(0.0001,en); g.connect(out);
+    let src;
+    if(n.w==='noise'){ if(!nb){ nb=ac.createBuffer(1,ac.sampleRate,ac.sampleRate); const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
+      src=ac.createBufferSource(); src.buffer=nb; src.loop=true; const f=ac.createBiquadFilter(); f.type='bandpass'; f.frequency.value=n.f; f.Q.value=3; src.connect(f); f.connect(g); }
+    else { src=ac.createOscillator(); src.type=n.w; src.frequency.value=n.f; src.connect(g); }
+    src.start(st); src.stop(en+.05); nodes.push(src); });
+  const len=scoreLen(s);
+  btn.textContent='■ 止める';
+  const tm=setTimeout(()=>{ if(playing&&playing.btn===btn){ btn.textContent='▶ 鳴らす'; playing=null; } },len*1000+200);
+  playing={btn,stop(){ clearTimeout(tm); nodes.forEach(x=>{try{x.stop()}catch(e){}}); out.disconnect(); btn.textContent='▶ 鳴らす'; }};
+}
+function drawRoll(cv,s){ const g=cv.getContext('2d'), W=cv.width=480, H=cv.height=96, L=Math.max(1,s.notes.reduce((a,n)=>Math.max(a,n.t+n.d),0));
+  g.fillStyle='#000'; g.fillRect(0,0,W,H);
+  s.notes.forEach(n=>{ const y=H-4-(Math.log2(n.f/40)/Math.log2(50))*(H-8);
+    g.fillStyle=n.w==='noise'?'rgba(200,53,43,.85)':`rgba(216,223,226,${.25+.7*n.g})`; g.fillRect(n.t/L*W,y-2,Math.max(2,n.d/L*W),4); }); }
+
+// ---------- カード ----------
+function el(tag,cls,html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderCard(card,step,i){
+  card.className='card'+(i===0?' first':'');
+  const who= step.model? MODELS[step.model].name : 'はじまり';
+  card.innerHTML='';
+  const head=el('div','head',`<b>${i===0?'':i+'. '}${G[step.kind]}</b><span>${esc(who)}</span>`); card.appendChild(head);
+  const body=el('div','body'); card.appendChild(body);
+  if(step.kind==='photo'){ const im=el('img'); im.src=step.url; im.alt=''; body.appendChild(im); }
+  if(step.kind==='words'){ body.appendChild(el('div','words')).textContent=step.text; }
+  if(step.kind==='draw'){
+    if(step.png){ const im=el('img'); im.src=step.png; im.alt=''; body.appendChild(im); }
+    if(step.err) body.appendChild(el('div','err')).textContent='描けなかった：'+step.err+'（次にはコードのまま渡す）';
+    const d=el('details'); d.innerHTML='<summary>コードを見る</summary>'; d.appendChild(el('pre')).textContent=step.code; body.appendChild(d); }
+  if(step.kind==='sound'){
+    if(step.score){ const cv=el('canvas','roll'); body.appendChild(cv); drawRoll(cv,step.score);
+      const b=el('button',null,'▶ 鳴らす'); b.onclick=()=>play(step.score,b); body.appendChild(b);
+      body.appendChild(el('div','note')).textContent=step.score.notes.length+'音・'+scoreLen(step.score).toFixed(1)+'秒・'+step.score.bpm+' bpm';
+      const d=el('details'); d.innerHTML='<summary>譜面を見る</summary>'; d.appendChild(el('pre')).textContent=JSON.stringify(step.score); body.appendChild(d); }
+    else { body.appendChild(el('div','err')).textContent='譜面が読めなかった：'+step.err; const d=el('details'); d.innerHTML='<summary>返ってきた文</summary>'; d.appendChild(el('pre')).textContent=step.raw; body.appendChild(d); } }
+  if(step.cut) body.appendChild(el('div','err')).textContent='返事が上限で途中で切れた';
+  if(step.cost!=null) card.appendChild(el('div','meta')).textContent='約'+(step.cost*YEN).toFixed(2)+'円';
+}
+function busyCard(i,kind,mkey){ const c=el('div','card busy'); c.innerHTML=`<div class="head"><b>${i}. ${G[kind]}</b><span>${MODELS[mkey].name}</span></div><div class="body"><span class="note"><span class="spin"></span> 訳している…</span></div>`; $('chain').appendChild(c); c.scrollIntoView({behavior:'smooth',block:'nearest'}); return c; }
+
+// ---------- 回す ----------
+let run=null, chain=[], total=0;
+function setStatus(t,err){ $('status').textContent=t||''; $('status').classList.toggle('err',!!err); }
+function addCost(c){ total+=c; $('cost').textContent='費用：約'+(total*YEN).toFixed(1)+'円（$'+total.toFixed(4)+'）'; }
+
+$('go').onclick=async()=>{
+  if(!$('apiKey').value.trim()){ setStatus('APIキーを入れてな。',true); $('apiKey').focus(); return; }
+  rememberKey();
+  let first;
+  if(mode==='ehon' && startKind==='data'){ if(!dataSet){ setStatus('CSVを選んでな。',true); return; } }
+  else if(startKind==='photo'){ if(!startImage){ setStatus('はじまりの写真を選んでな。',true); return; } first={kind:'photo',url:startImage.url,data:startImage.data,media:startImage.media}; }
+  else { const t=$('startText').value.trim(); if(!t){ setStatus('はじまりの言葉を書いてな。',true); return; } first={kind:'words',text:t}; }
+  chain= first? [first] : []; total=0; addCost(0); $('chain').innerHTML=''; $('compare').classList.remove('on'); $('read').hidden=true; $('resume').hidden=true;
+  const ctrl=new AbortController(); run={ctrl,stopped:false};
+  $('go').disabled=true; $('stop').disabled=false; $('save').disabled=true;
+  if(mode==='ehon'){
+    await ehonGo(ctrl); return; }
+  const c0=el('div'); $('chain').appendChild(c0); renderCard(c0,first,0);
+  const set=getSet(), plan= mode==='loop'? planLoop(first.kind,Math.max(3,Math.min(12,+$('hops').value||6)),set) : null;
+  const max= mode==='loop'? plan.length : 40;
+  try{
+    for(let i=1;i<=max && !run.stopped;i++){
+      const prev=chain[chain.length-1], target= plan? plan[i-1] : nextFlow(prev.kind,set), mkey=pickModel(i-1);
+      setStatus(`${i}手目：${G[prev.kind]} → ${G[target]}（${MODELS[mkey].name}）`);
+      const card=busyCard(i,target,mkey);
+      let res;
+      try{ res=await translate(prev,target,mkey,ctrl.signal); }
+      catch(e){ if(run.stopped) { card.remove(); break; } card.remove(); throw e; }
+      addCost(res.cost);
+      const step={kind:target,model:mkey,cost:res.cost,usage:res.usage,cut:res.cut};
+      if(target==='words') step.text=res.text;
+      if(target==='draw'){ step.code=block(res.text); if(res.cut) step.code=salvage(step.code); const r=await runDraw(step.code); if(r.png) step.png=r.png; else step.err=r.err; }
+      if(target==='sound'){ step.raw=res.text; try{ step.score=parseScore(res.text); }catch(e){ step.err=e.message; step.kind='words'; step.text=res.text; step.soundFailed=true; } }
+      chain.push(step); renderCard(card,step,i);
+      if(step.soundFailed){ card.querySelector('.head b').textContent=i+'. 音（譜面にならず言葉のまま）'; }
+    }
+    if(!run.stopped) setStatus(mode==='loop'?'一周した。':'40手で止めた。'); else setStatus('止めた。');
+    showCompare();
+  }catch(e){ setStatus('止まった：'+e.message,true); showCompare(); }
+  finally{ $('go').disabled=false; $('stop').disabled=true; $('save').disabled=chain.length<2; const last=$('chain').lastElementChild; if(last&&chain.length>1) last.classList.add('last'); run=null; }
+};
+$('stop').onclick=()=>{ if(run){ run.stopped=true; run.ctrl.abort(); } };
+let lastStop='';
+let ehonReader='adult';
+let ehonData=null;
+async function ehonGo(ctrl,resume){
+  if(!resume){ ehonReader=readerKind; ehonData= startKind==='data'&&dataSet? {name:dataSet.name,kind:dataSet.kind,follow,three:$('three').checked,stage:$('three').checked?$('stage').value.trim():'',cast:castCount(dataSet),chapters:chaptersOf(dataSet,Math.max(3,Math.min(16,+$('hops').value||8)))} : null; }
+  run.reader=ehonReader; run.data=ehonData; run.three= !!(ehonData && ehonData.three);
+  $('chain').classList.toggle('three',run.three);
+  $('resume').hidden=true; $('endSoon').hidden=false; $('endSoon').disabled=false; $('endSoon').textContent='次のページで終わらせる';
+  try{ await runEhon(run.data? run.data.chapters.length : $('endless').checked ? 40 : Math.max(3,Math.min(16,+$('hops').value||8)), ctrl);
+    lastStop= run.stopped?'止めた':'できた'; setStatus(run.stopped?'止めた。「続きを回す」で続けられる。':'絵本ができた。「めくって読む」で一ページずつ読める。'); }
+  catch(e){ lastStop= run.stopped?'止めた':'止まった：'+e.message; setStatus(run.stopped?'止めた。「続きを回す」で続けられる。':'止まった：'+e.message+'（「続きを回す」でここから続けられる）',!run.stopped); }
+  finally{ const done=!!run.ended; $('go').disabled=false; $('stop').disabled=true; $('save').disabled=chain.length<2; $('read').hidden=chain.length<2; $('endSoon').hidden=true; $('resume').hidden=done||chain.length<1; run=null; }
+}
+$('resume').onclick=async()=>{ if(run||!chain.length||mode!=='ehon') return; rememberKey();
+  const ctrl=new AbortController(); run={ctrl,stopped:false}; $('go').disabled=true; $('stop').disabled=false; $('save').disabled=true; await ehonGo(ctrl,true); };
+$('endSoon').onclick=()=>{ if(run){ run.endSoon=true; $('endSoon').textContent='次で終わる'; $('endSoon').disabled=true; } };
+
+// 文の返事が空なら、同じ訳し手にもう一回、それでも空なら別の訳し手（Sonnet、Sonnetなら Opus）に頼む
+async function callText(system,content,mkey,maxTokens,signal){ let r=await callClaude(system,content,mkey,maxTokens,signal);
+  const ok=x=> x.text.trim() && x.stop!=='refusal'; // 途中で止められた（refusal）ときも、空と同じ扱いでやり直す
+  if(ok(r)) return r;
+  addCost(r.cost); setStatus((r.stop==='refusal'?'返事が途中で止められた':'返事が空やった')+'（'+(r.stop||'?')+'）。もう一回頼む…');
+  let r2=await callClaude(system,content,mkey,maxTokens+3000,signal); if(ok(r2)) return r2;
+  addCost(r2.cost); const alt= mkey==='sonnet'?'opus':'sonnet'; setStatus('また空やった（'+(r2.stop||'?')+'）。'+MODELS[alt].name+'に代わってもらう…');
+  const r3=await callClaude(system,content,alt,maxTokens+3000,signal); r3.stand=alt; r3.emptyStops=[r.stop,r2.stop];
+  if(!r3.text.trim()) r3.text=(r2.text.trim()||r.text.trim()); return r3; } // 三回とも空なら、途中まででも残っている文を使う
+// ---------- ドラッグ＆ドロップ：写真は「はじまりの写真」、CSVは「データ絵本」 ----------
+(function(){ let depth=0; const ov=document.createElement('div'); ov.id='dropOv'; ov.textContent='ここに落とす（写真 → はじまりの写真、CSV → データ絵本）'; document.body.appendChild(ov);
+  const isFileDrag=e=>{ const t=e.dataTransfer&&e.dataTransfer.types; if(!t) return false; for(let i=0;i<t.length;i++){ if(t[i]==='Files'||t[i]==='application/x-moz-file') return true; } return false; };
+  const opt={capture:true};
+  document.addEventListener('dragenter',e=>{ if(!isFileDrag(e)) return; e.preventDefault(); depth++; ov.classList.add('on'); },opt);
+  document.addEventListener('dragover',e=>{ if(!isFileDrag(e)) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; ov.classList.add('on'); },opt);
+  document.addEventListener('dragleave',e=>{ if(!isFileDrag(e)) return; depth=Math.max(0,depth-1); if(!depth) ov.classList.remove('on'); },opt);
+  window.addEventListener('blur',()=>{ depth=0; ov.classList.remove('on'); });
+  document.addEventListener('drop',async e=>{ if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return; e.preventDefault(); e.stopPropagation(); depth=0; ov.classList.remove('on');
+    if(run){ setStatus('回している途中は入れ替えられへん。止めてから落としてな。',true); return; }
+    const f=e.dataTransfer.files[0]; const name=(f.name||'').toLowerCase();
+    try{
+      if((f.type||'').startsWith('image/')||/\.(png|jpe?g|gif|webp|heic)$/.test(name)){
+        if(mode==='ehon') $('modeSeg').querySelector('[data-m=loop]').click();
+        $('startKind').querySelector('[data-k=photo]').click(); await loadPhoto(f); setStatus('写真を「はじまり」に入れた：'+f.name); }
+      else if(name.endsWith('.csv')||/csv/.test(f.type||'')){
+        if(mode!=='ehon') $('modeSeg').querySelector('[data-m=ehon]').click();
+        $('startKind').querySelector('[data-k=data]').click(); await loadCsv(f); setStatus(dataSet?'CSVを読んだ：'+f.name:'CSVが読めなかった：'+$('csvInfo').textContent,!dataSet); $('dataBox').scrollIntoView({behavior:'smooth',block:'center'}); }
+      else setStatus('写真かCSVを落としてな（'+f.name+' は使えへん）',true);
+    }catch(err){ setStatus('落としたファイルを読めなかった：'+err.message,true); } },opt);
+})();
+
+// ---------- 絵本 ----------
+const ILLUS_BASE=`You illustrate one page of a picture book. You are given only the text of this page, not the rest of the story. Draw the scene as a picture-book illustrator would.`;
+const ILLUS_FOR={
+  kids:`This book is for young children (about 4 to 7). Use bright, warm colors and simple friendly shapes. Nothing frightening, violent or gloomy.`,
+  adult:`This book is for adults. You may be quiet, strange, melancholic or abstract; muted colors, empty space and odd scale are welcome.`};
+const WRITER=`You are writing a picture book together with an illustrator you cannot talk to.
+Each time, you see the story so far and the illustration just drawn for the latest page. The illustrator never read the earlier pages, so the picture may not match what you meant.
+Accept the picture as what really happened in the story. Compare it with the previous illustration when you are given one: whatever changed — a character's shape, size, clothes, the place, the weather, the time of day, things that appeared or vanished — really changed inside the story. Do not smooth it over or ignore it. Let the story be pulled by those changes, and write the next page: what happens next and what the characters feel. Do not describe the picture.
+No title, no page number, no quotation marks around the whole text, no emoji. Output only the page text.`;
+const WRITER_DATA={
+  base:`The characters of this book are counting systems from many cultures and from nature (Maya, Inca, Base-60, Egyptian, Hifumi, the I Ching, Tala, the Clave, primes, tides, breath and heartbeat…). They live in one world where each of them sounds only at its own marks. For every page you receive a record of what really happened in one stretch of that world.
+Meanings: "sounding" = speaking up / appearing; "same reason" = discovering they are the same kind; "passed each other" = one came late and they missed each other by a few counts; "pushed out of step by a collision" = jostled, forced to change their timing; "refused" = would not be moved, and someone else carried the burden; "frozen" = the whole world stopped and could not move; "a beat that exists only between two" = a bond or private rhythm born between them (and it can fade again).`,
+  strict:`Every event in the record must happen on this page, in story form. You may choose which characters to focus on, but do not leave out or contradict an event. Because of this, the page may be 2 to 7 lines.`,
+  loose:`Use the record only as weather and mood. You may follow, ignore or transform any event.`};
+const HUMAN=`You translate a story about counting systems into a human drama about ordinary people. Never give two counting systems the same human role. You are given the counting-systems story so far, the human drama so far, and the counting-systems page to translate now.
+Keep the same skeleton: the same events, in the same order, with the same weight. Give each counting system one human role (a person, a family member, a coworker, a neighbour…) and keep that casting fixed for the whole book; a person who is gone stays gone until the same counting system returns. Turn mechanics into human things: refusing to be moved becomes someone who will not change, a freeze becomes everyone stuck, a beat only two share becomes something private between two people.
+Never mention counting systems, beats, counts or numbers from the record. Do not describe a picture. Write in Japanese, at most as many lines as the counting-systems page, in plain human prose. Output only the page text.`;
+const CAST=`Here is a picture book told twice: once with counting systems as characters, once as a human drama with a fixed casting. List the casting as lines of the form
+counting system name｜human role
+For the left side, use the names exactly as they appear in the official name list you are given (for example 60進, not 六十進). Only include characters who appear in both versions. One line per counting system. No other text.`;
+const WRITER_FOR={
+  kids:`This book is for young children (about 4 to 7) to read aloud with a grown-up. Write in Japanese, 1 to 3 short lines, almost all in hiragana (only the simplest kanji), with a space between phrases (分かち書き), like 「くまさんは もりへ いきました」. Gentle, playful, warm. Nothing frightening, violent or cruel; if something strange happens, let it be funny or tender.`,
+  adult:`This book is for adults. Write in Japanese, 1 to 4 short lines, with ordinary kanji. It may be strange, absurd, sad or quiet, and it does not have to be kind or make sense. Avoid the sing-song children's-book voice and avoid morals.`};
+function pageCard(n){ const c=el('div','card page'); c.dataset.page=n;
+  const three= run&&run.three;
+  c.innerHTML=`<div class="head"><b>${n} ページ</b><span class="who"></span></div>`
+    + (three? `<div class="layer raw"><div class="lbl">一　CSV</div><pre></pre></div><div class="layer drama"><div class="lbl">二　数え方の話</div>` : '')
+    + `<div class="pic"><span class="note"><span class="spin"></span> 描いている…</span></div><div class="ptext"></div>`
+    + (three? `</div><div class="layer human"><div class="lbl">三　人間ドラマ</div><div class="pic"><span class="note">（まだ）</span></div><div class="ptext"></div></div>` : '')
+    + `<div class="meta"></div>`;
+  $('chain').appendChild(c); return c; }
+const Q=(card,sel)=>card.querySelector(card.querySelector('.layer.drama')? '.layer.drama '+sel : sel);
+function fillPic(card,step,box){ box=box||(card.querySelector('.layer.drama')||card); const p=box.querySelector('.pic'); p.innerHTML='';
+  if(step.png){ const im=el('img'); im.src=step.png; im.alt=''; p.appendChild(im); }
+  else { p.appendChild(el('div','err')).textContent='描けなかった：'+(step.err||''); }
+  if(step.code){ const d=el('details'); d.style.padding='0 14px'; d.innerHTML='<summary>コードを見る</summary>'; d.appendChild(el('pre')).textContent=step.code; box.querySelector('.ptext').after(d); } }
+function pageCardOf(n){ return $('chain').querySelector(`.page[data-page="${n}"]`) || (()=>{ const c=pageCard(n); c.dataset.page=n; return c; })(); }
+// 絵本を回す。chain にあるところから続ける（最初から回すときは chain=[最初の言葉] で呼ぶ）
+async function runEhon(pages,ctrl){
+  const texts=()=>chain.filter(x=>x.kind==='words').map(x=>x.text);
+  const pics=()=>chain.filter(x=>x.kind==='draw').length;
+  if(!$('chain').querySelector('.page') && chain[0]){ const c=pageCardOf(1); c.querySelector('.ptext').textContent=chain[0].text; c.querySelector('.who').textContent='言葉：あなた'; }
+  while(!run.stopped){
+    const T=texts();
+    if(T.length>pics()){
+      // 絵：このページの文だけを見て描く
+      const p=pics()+1, card=pageCardOf(p), mi=pickModel(2*(p-1)); setStatus(`${p}ページの絵（${MODELS[mi].name}）`);
+      Q(card,'.pic').innerHTML='<span class="note"><span class="spin"></span> 描いている…</span>';
+      card.scrollIntoView({behavior:'smooth',block:'nearest'});
+      const r1=await callClaude(ILLUS_BASE+'\n'+ILLUS_FOR[run.reader||'adult'],[{type:'text',text:'Text of this page:\n\n'+T[p-1]},{type:'text',text:TARGET.draw}],mi,8000,ctrl.signal);
+      addCost(r1.cost);
+      const pic={kind:'draw',model:mi,cost:r1.cost,usage:r1.usage,cut:r1.cut,page:p}; pic.code=block(r1.text); if(r1.cut) pic.code=salvage(pic.code);
+      const rr=await runDraw(pic.code); if(rr.png) pic.png=rr.png; else pic.err=rr.err;
+      chain.push(pic); fillPic(card,pic);
+      card.querySelector('.who').textContent+=' / 絵：'+MODELS[mi].name;
+      card.querySelector('.meta').textContent='約'+((card._cost=(card._cost||0)+r1.cost)*YEN).toFixed(2)+'円';
+      continue;
+    }
+    // 三層：数え方の話を人間ドラマに訳して、その絵を描く
+    if(run.three){
+      const H=chain.filter(x=>x.kind==='hwords'), HP=chain.filter(x=>x.kind==='hdraw');
+      if(H.length<T.length){
+        const p=H.length+1, card=pageCardOf(p), box=card.querySelector('.layer.human'), mh=pickModel(2*(p-1)+1); setStatus(`${p}ページの人間ドラマ（${MODELS[mh].name}）`);
+        box.querySelector('.ptext').innerHTML='<span class="note"><span class="spin"></span> 人に訳している…</span>'; card.scrollIntoView({behavior:'smooth',block:'nearest'});
+        const csvStory=T.slice(0,p-1).map((t,i)=>`[${i+1}]\n${t}`).join('\n\n'), humStory=H.map((x,i)=>`[${i+1}]\n${x.text}`).join('\n\n');
+        const stageTxt= run.data&&run.data.stage? `\nThe human drama takes place in this setting: ${run.data.stage}. Let the people, their jobs, objects, speech and surroundings belong to that world. The setting changes only the surface; the skeleton of events stays exactly the same.` : '';
+        const r=await callText(HUMAN+stageTxt+'\n'+WRITER_FOR[run.reader||'adult'].replace(/Write in Japanese[^.]*\./,''),[{type:'text',text:(csvStory?'The counting-systems story so far:\n\n'+csvStory:'This is the first page.')+(humStory?'\n\nThe human drama so far:\n\n'+humStory:'')},{type:'text',text:`The counting-systems page ${p} to translate now:\n\n`+T[p-1]}],mh,5000,ctrl.signal);
+        addCost(r.cost); const t=r.text.trim()||'（白いページ）'; chain.push({kind:'hwords',model:r.stand||mh,cost:r.cost,usage:r.usage,page:p,text:t,stop:r.stop,emptyStops:r.emptyStops});
+        box.querySelector('.ptext').textContent=t; card.querySelector('.meta').textContent='約'+((card._cost=(card._cost||0)+r.cost)*YEN).toFixed(2)+'円';
+        continue; }
+      if(HP.length<H.length){
+        const p=HP.length+1, card=pageCardOf(p), box=card.querySelector('.layer.human'), mi=pickModel(2*(p-1)); setStatus(`${p}ページの人間ドラマの絵（${MODELS[mi].name}）`);
+        box.querySelector('.pic').innerHTML='<span class="note"><span class="spin"></span> 描いている…</span>';
+        const r1=await callClaude(ILLUS_BASE+'\n'+ILLUS_FOR[run.reader||'adult']+(run.data&&run.data.stage?`\nThe story is set in: ${run.data.stage}.`:''),[{type:'text',text:'Text of this page:\n\n'+H[p-1].text},{type:'text',text:TARGET.draw}],mi,8000,ctrl.signal);
+        addCost(r1.cost); const pic={kind:'hdraw',model:mi,cost:r1.cost,usage:r1.usage,cut:r1.cut,page:p}; pic.code=block(r1.text); if(r1.cut) pic.code=salvage(pic.code);
+        const rr=await runDraw(pic.code); if(rr.png) pic.png=rr.png; else pic.err=rr.err;
+        chain.push(pic); fillPic(card,pic,box); card.querySelector('.meta').textContent='約'+((card._cost=(card._cost||0)+r1.cost)*YEN).toFixed(2)+'円';
+        continue; }
+    }
+    // ここで終わりか
+    const lastWords=[...chain].reverse().find(x=>x.kind==='words');
+    if((lastWords&&lastWords.last) || T.length>=pages) {
+      if(run.three && !chain.some(x=>x.kind==='cast')){ setStatus('エンドロールの配役を決めている…');
+        const H=chain.filter(x=>x.kind==='hwords').map((x,i)=>`[${i+1}]\n${x.text}`).join('\n\n'), C=T.map((t,i)=>`[${i+1}]\n${t}`).join('\n\n');
+        const names=(run.data&&run.data.cast||[]).map(x=>x[0]).join('、');
+        try{ const r=await callClaude(CAST,[{type:'text',text:'Official name list: '+names+'\n\nCounting-systems version:\n\n'+C+'\n\nHuman version:\n\n'+H}],pickModel(1),1500,ctrl.signal); addCost(r.cost);
+          chain.push({kind:'cast',cost:r.cost,lines:r.text.split('\n').map(l=>l.split('｜').map(x=>x.trim())).filter(x=>x.length===2&&x[0]&&x[1])}); }
+        catch(e){ if(e.name==='AbortError') throw e; } }
+      run.ended=true; break; }
+    // 次のページ：それまでの話を全部覚えたまま、前の絵と今の絵を見て書く
+    const p=T.length, mw=pickModel(2*(p-1)+1), last=(p+1>=pages) || run.endSoon;
+    if(last){ $('endSoon').disabled=true; }
+    setStatus(`${p+1}ページの言葉（${MODELS[mw].name}）`);
+    const next=pageCardOf(p+1); next.querySelector('.who').textContent='言葉：'+MODELS[mw].name; Q(next,'.pic').innerHTML='<span class="note">（まだ白いページ）</span>';
+    Q(next,'.ptext').innerHTML='<span class="note"><span class="spin"></span> 書いている…</span>';
+    next.scrollIntoView({behavior:'smooth',block:'nearest'});
+    const story=T.map((t,i)=>`[${i+1}]\n${t}`).join('\n\n');
+    const imgOf=x=> x.png? {type:'image',source:{type:'base64',media_type:'image/png',data:x.png.split(',')[1]}} : {type:'text',text:'(The illustration failed to render. This is the code the illustrator wrote:)\n'+x.code};
+    const cur=chain.find(x=>x.kind==='draw'&&x.page===p), prevPic=chain.find(x=>x.kind==='draw'&&x.page===p-1);
+    const imgBlocks= !cur? [] : prevPic? [{type:'text',text:`The previous illustration (page ${p-1}):`},imgOf(prevPic),{type:'text',text:`The illustration for page ${p} (the latest page):`},imgOf(cur)] : [{type:'text',text:`The illustration for page ${p}:`},imgOf(cur)];
+    const ch= run.data? run.data.chapters[p] : null;
+    const evBlocks= ch? [{type:'text',text:`The record of what really happened for page ${p+1} (counts ${ch.a}–${ch.b}):\n- `+ch.events.join('\n- ')}] : [];
+    const ask= last? `Write page ${p+1}. This is the last page: bring the story to an end, without explaining it.` : `Write page ${p+1}.`;
+    let r2;
+    const sys= WRITER+'\n'+WRITER_FOR[run.reader||'adult'] + (run.data? '\n'+WRITER_DATA.base+'\n'+WRITER_DATA[run.data.follow] : '');
+    try{ r2=await callText(sys,[{type:'text',text: story? 'The story so far:\n\n'+story : 'This is the first page. Nothing has been written yet.'},...imgBlocks,...evBlocks,{type:'text',text:ask}],mw,4000,ctrl.signal); }
+    catch(e){ next.remove(); throw e; }
+    addCost(r2.cost);
+    const t=r2.text.trim()||'（白いページ）'; chain.push({kind:'words',model:r2.stand||mw,stop:r2.stop,emptyStops:r2.emptyStops,cost:r2.cost,usage:r2.usage,page:p+1,text:t,last,events:ch?ch.events:undefined,counts:ch?[ch.a,ch.b]:undefined});
+    Q(next,'.ptext').textContent=t;
+    if(ch && next.querySelector('.layer.raw')) next.querySelector('.layer.raw pre').textContent=ch.raw;
+    if(ch){ const dd=el('details','ev'); dd.innerHTML='<summary>この区間で起きたこと（カウント'+ch.a+'〜'+ch.b+'）</summary>'; dd.appendChild(el('pre')).textContent='・'+ch.events.join('\n・'); Q(next,'.ptext').after(dd); } next._cost=r2.cost; next.querySelector('.meta').textContent='約'+(r2.cost*YEN).toFixed(2)+'円';
+  }
+}
+
+// ---------- めくって読む ----------
+let rpages=[], ri=0;
+function bookPages(){ const three=chain.some(s=>s.kind==='hwords');
+  if(!three){ const ps=[]; chain.forEach(s=>{ if(s.kind==='words'&&(s.page||ps.length===0)) ps.push({text:s.text,png:null}); if(s.kind==='draw'&&ps.length) ps[ps.length-1].png=s.png||null; }); return ps; }
+  const ps=[], at=(k,p)=>chain.find(s=>s.kind===k&&s.page===p);
+  for(let p=1;at('words',p);p++){ const w=at('words',p), d=at('draw',p), h=at('hwords',p), hd=at('hdraw',p);
+    if(w.events) ps.push({raw:true,lbl:p+' ページ　一　CSV（カウント'+w.counts[0]+'〜'+w.counts[1]+'）',text:(ehonData&&ehonData.chapters[p-1]?ehonData.chapters[p-1].raw:'')});
+    ps.push({lbl:p+' ページ　二　数え方の話',text:w.text,png:d&&d.png});
+    if(h) ps.push({lbl:p+' ページ　三　人間ドラマ',text:h.text,png:hd&&hd.png}); }
+  ps.push({credits:true,lbl:'エンドロール',text:'→ で流す'}); return ps; }
+function showPage(){ const p=rpages[ri]; $('rImg').innerHTML=''; $('rText').style.font=''; $('rText').style.textAlign='';
+  if(p.png){ const im=el('img'); im.src=p.png; $('rImg').appendChild(im); }
+  if(p.raw){ $('rImg').innerHTML=''; const pre=el('pre'); pre.style.cssText='margin:0;padding:24px;font:13px/1.8 ui-monospace,Menlo,monospace;color:#8fa3a8;white-space:pre;overflow:auto;width:100%;height:100%;box-sizing:border-box'; pre.textContent=p.text; $('rImg').appendChild(pre); $('rText').textContent=''; }
+  else $('rText').textContent=p.text;
+  $('rNum').textContent=(p.lbl?p.lbl+'　':'')+(ri+1)+' / '+rpages.length; }
+function rollCredits(){ const R=$('creditsRoll'); R.innerHTML=''; const castLine=chain.find(s=>s.kind==='cast'), roles=new Map((castLine?castLine.lines:[]).map(([k,v])=>[k,v]));
+  const add=(h)=>{ R.appendChild(el('h3')).textContent=h; }, row=(a,b)=>{ const d=el('div','row2'); d.appendChild(el('span')).textContent=a; d.appendChild(el('span')).textContent=b; R.appendChild(d); };
+  add('出　演'); (ehonData&&ehonData.cast||[]).slice(0,30).forEach(([k,n])=>{ const role=roles.get(k)||[...roles].find(([kk])=>kk.includes(k)||k.includes(kk))?.[1]; row(role? role : k, (role? k+'　' : '')+n+'回'); });
+  if(ehonData&&ehonData.stage){ add('舞　台'); row(ehonData.stage,''); }
+  add('台　本'); row(ehonData?ehonData.name:'',''); row(ehonData&&ehonData.kind==='galaxy'?'異文法の銀河':'関係を演奏する楽器','');
+  const models=[...new Set(chain.filter(s=>s.model).map(s=>MODELS[s.model].name))]; add('訳'); models.forEach(m=>row(m,''));
+  add('音　楽'); row('異文法グルーヴ','');
+  R.appendChild(el('div')).innerHTML='<div style="height:20vh"></div><div style="font-size:13px;letter-spacing:.3em;color:#888">hallucination freqwave</div><div style="height:40vh"></div>';
+  $('credits').classList.add('on'); R.style.transition='none'; R.style.transform='translateY(0)'; void R.offsetHeight;
+  const dist=R.offsetHeight+innerHeight, secs=Math.max(25,dist/60); R.style.transition=`transform ${secs}s linear`; R.style.transform=`translateY(-${dist}px)`; }
+$('cClose').onclick=()=>$('credits').classList.remove('on');
+$('read').onclick=()=>{ rpages=bookPages(); if(!rpages.length) return; ri=0; showPage(); $('reader').classList.add('on'); };
+$('rClose').onclick=()=>$('reader').classList.remove('on');
+$('rPrev').onclick=()=>{ if(ri>0){ ri--; showPage(); } };
+$('rNext').onclick=()=>{ if(rpages[ri]&&rpages[ri].credits){ rollCredits(); return; } if(ri<rpages.length-1){ ri++; showPage(); } };
+document.addEventListener('keydown',e=>{ if(!$('reader').classList.contains('on')) return; if(e.key==='ArrowRight') $('rNext').click(); if(e.key==='ArrowLeft') $('rPrev').click(); if(e.key==='Escape'){ if($('credits').classList.contains('on')) $('cClose').click(); else $('rClose').click(); } });
+
+function showCompare(){ if(chain.length<2) return; const p=$('comparePair'); p.innerHTML='';
+  [[chain[0],'最初'],[chain[chain.length-1],'最後（'+(chain.length-1)+'手後）']].forEach(([s,l])=>{ const d=el('div'); d.appendChild(el('div','lbl')).textContent=l;
+    if(s.kind==='photo'){ const im=el('img'); im.src=s.url; d.appendChild(im); }
+    else if(s.kind==='draw' && s.png){ const im=el('img'); im.src=s.png; d.appendChild(im); }
+    else if(s.kind==='words'){ d.appendChild(el('div','words')).textContent=s.text; }
+    else if(s.kind==='sound' && s.score){ const cv=el('canvas'); cv.style.aspectRatio='5/1'; d.appendChild(cv); drawRoll(cv,s.score); }
+    else d.appendChild(el('pre')).textContent=s.code||s.raw||'';
+    p.appendChild(d); });
+  $('compare').classList.add('on'); }
+
+$('save').onclick=()=>{ const data={app:'dengon',date:new Date().toISOString(),mode,reader:mode==='ehon'?ehonReader:undefined,data:ehonData?{name:ehonData.name,kind:ehonData.kind,follow:ehonData.follow,three:ehonData.three,stage:ehonData.stage}:undefined,costUSD:total,status:$('status').textContent,
+    chain:chain.map(s=>{ const o={...s}; delete o.data; return o; })};
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}));
+  a.download='dengon_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
+})();
+</script>
+</body>
+</html>
